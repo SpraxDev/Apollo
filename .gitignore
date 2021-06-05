@@ -1,0 +1,10 @@
+/logs/
+/storage/
+
+/node_modules/
+
+# JetBrains IDE
+/.idea/
+/*.iml
+
+%{0- globals.url.static 0}/

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de" class="h-100">
+<head>
+  %{0- include('/_head.html') -0}
+
+  <title>Live-Wiedergabe von %{2- page.file.name -2}</title>
+</head>
+<body class="d-flex h-100 preview-page">
+
+%{2_ if (false /* page.file.mimeType.startsWith('image/') */) { _2}
+<img src="%{2- page.file.downloadPath -2}?preview=1" alt="%{2- page.file.name -2}">
+%{2_ } else if (page.file.mimeType.startsWith('video/')) { _2}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.0.5/dist/hls.min.js"
+        integrity="sha256-uSj/yBTrKht77G4FPWXNaZozO/CY+Oqd+dKmfKxQ+uI=" crossorigin="anonymous"></script>
+<video id="video" poster="/thumbnail%{2- page.file.browsePath -2}?size=500" controls></video>
+
+<div id="controls">
+
+</div>
+
+<script>
+  let hls;
+
+  const video = document.getElementById('video');
+  const videoSrc = '%{2- page.hls.master -2}';
+
+  if (Hls.isSupported()) {
+    hls = new Hls({
+      // debug: true,
+      startPosition: 0,
+      backBufferLength: 60
+    });
+    hls.loadSource(videoSrc);
+    hls.attachMedia(video);
+    hls.recoverMediaError();
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = videoSrc;
+  }
+
+  const updateControls = () => {
+    const controlsElement = document.getElementById('controls');
+    let innerHtml = '';
+
+
+    for (let i = 0; i < hls.audioTracks.length; ++i) {
+      const audioTrack = hls.audioTracks[i];
+
+      innerHtml += `<button onclick="hls.audioTrack=${i}" style="background-color: ${hls.audioTrack === i ? 'red' : 'aqua'}">${audioTrack.name} (${audioTrack.lang}) [#${i}]</button>`;
+    }
+
+    innerHtml += '<hr>';
+
+    innerHtml += `<button onclick="hls.currentLevel=${-1}" style="background-color: ${hls.autoLevelEnabled ? 'red' : 'aqua'}">auto</button>`;
+    for (let i = 0; i < hls.levels.length; ++i) {
+      const level = hls.levels[i];
+
+      innerHtml += `<button onclick="hls.currentLevel=${i}" style="background-color: ${hls.currentLevel === i ? 'red' : 'aqua'}">${level.name} (${level.width}x${level.height}) [#${i}]</button>`;
+    }
+
+    controlsElement.innerHTML = innerHtml;
+  };
+  hls.on(Hls.Events.MANIFEST_PARSED, updateControls);
+  hls.on(Hls.Events.LEVEL_SWITCHED, updateControls);
+  hls.on(Hls.Events.LEVEL_UPDATED, updateControls);
+  hls.on(Hls.Events.AUDIO_TRACK_SWITCHING, updateControls);
+  hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, updateControls);
+</script>
+
+<!--<video id="video" controls></video>-->
+
+<!--<script>-->
+<!--  var video = document.getElementById('video');-->
+<!--  if (Hls.isSupported()) {-->
+<!--    var hls = new Hls({-->
+<!--      debug: true-->
+<!--    });-->
+<!--    hls.loadSource('%{2- page.hls.master -2}');-->
+<!--    hls.attachMedia(video);-->
+<!--    hls.on(Hls.Events.MEDIA_ATTACHED, () => {-->
+<!--      video.currentTime = 0;-->
+<!--      //   video.muted = true;-->
+<!--      //   video.play();-->
+<!--    });-->
+<!--  }-->
+<!--      // hls.js is not supported on platforms that do not have Media Source Extensions (MSE) enabled.-->
+<!--      // When the browser has built-in HLS support (check using `canPlayType`), we can provide an HLS manifest (i.e. .m3u8 URL) directly to the video element throught the `src` property.-->
+<!--  // This is using the built-in support of the plain video element, without using hls.js.-->
+<!--  else if (video.canPlayType('application/vnd.apple.mpegurl')) {-->
+<!--    video.src = '%{2- page.hls.master -2}';-->
+<!--    // video.addEventListener('canplay', () => {-->
+<!--    //   video.play();-->
+<!--    // });-->
+<!--  }-->
+<!--</script>
+-->
+%{2_ } else if (false /* page.file.mimeType.startsWith('audio/') || page.file.mimeType == 'application/ogg' */) { _2}
+<audio src="%{2- page.file.downloadPath -2}?preview=1" controls></audio>
+%{2_ } else { _2}
+%{2_ throw new Error('mime/type not supported') _2}
+%{2_ } _2}
+</body>
+</html>

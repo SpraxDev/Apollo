@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de" class="h-100">
+<head>
+  %{0- include('/_head.html') -0}
+
+  %{2_ if (page.raw) { _2}
+  <link rel="stylesheet" href="%{0- globals.url.static 0}/assets/css/highlight.js.darcula.css">
+  %{2_ } _2}
+
+  <title>Vorschau von %{2- page.file.name -2}</title>
+</head>
+<body class="d-flex h-100 preview-page">
+
+%{2_ if (page.raw) { _2}
+<pre><code>%{2- page.raw.replace(/</g, '&lt;').replace(/>/g, '&gt;') -2}</code></pre>
+%{2_ } else if (['application/pdf'].includes(page.file.mimeType)) { _2}
+<object data="%{2- page.file.downloadPath -2}?preview=1" type="%{2- page.file.mimeType -2}">
+  <a href="%{2- page.file.downloadPath -2}?preview=1">Download the File</a>
+</object>
+%{2_ } else if (page.file.mimeType.startsWith('image/')) { _2}
+<img src="%{2- page.file.downloadPath -2}?preview=1" alt="%{2- page.file.name -2}">
+%{2_ } else if (page.file.mimeType.startsWith('video/')) { _2}
+<video src="%{2- page.file.downloadPath -2}?preview=1" controls></video>
+%{2_ } else if (page.file.mimeType.startsWith('audio/') || page.file.mimeType == 'application/ogg') { _2}
+<audio src="%{2- page.file.downloadPath -2}?preview=1" controls></audio>
+%{2_ } else { _2}
+%{2_ throw new Error('mime/type not supported') _2}
+%{2_ } _2}
+
+%{2_ if (page.raw) { _2}
+<script src="%{0- globals.url.static 0}/assets/js/highlight.pack.js"></script>
+<script>hljs.highlightAll();</script>
+%{2_ } _2}
+</body>
+</html>

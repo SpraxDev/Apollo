@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="de" class="h-100">
+<head>
+  %{0- include('/_head.html') -0}
+
+  <title>NASWeb</title>
+
+  <script>
+    const browsePageCfg = {typeFront: '%{2= page.typeFront 2}'};
+  </script>
+</head>
+
+<body class="d-flex flex-column h-100">
+<header>
+  <nav class="navbar navbar-light bg-light" aria-label="Header mit Informationen">
+    <div class="container-fluid">
+      <div class="me-auto">
+        <span class="navbar-brand">NAS<sub>Web</sub></span>
+      </div>
+
+      <div>
+        Eingeloggt als %{2- user.name 2}
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <div class="row w-100">
+    <!-- Left sidebar -->
+    <div class="col-auto mt-5">
+      <div class="container-fluid small">
+        <nav class="nav flex-column" aria-label="Sidebar mit Navigationselementen">
+          <a class="nav-link active" href="%{0- globals.url.base 0}/browse/"><img
+              src="%{0- globals.url.static 0}/img/feathericons/cloud.svg"
+              width="24" height="24" alt="" aria-hidden="true">&nbsp;Meine Dateien</a>
+
+          <a class="nav-link" href="#"><img src="%{0- globals.url.static 0}/img/feathericons/users.svg"
+                                            width="24" height="24" alt="" aria-hidden="true">&nbsp;Für mich freigegeben</a>
+
+          <a class="nav-link" href="#"><img src="%{0- globals.url.static 0}/img/feathericons/clock.svg" width="24"
+                                            height="24" alt="" aria-hidden="true">&nbsp;Neuste</a>
+
+          <a class="nav-link" href="%{0- globals.url.base 0}/trash/"><img
+              src="%{0- globals.url.static 0}/img/feathericons/trash-2.svg"
+              width="24" height="24" alt="" aria-hidden="true">&nbsp;Papierkorb</a>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Center -->
+    <div class="col drop-zone" ondrop="onFilesDrop(event)"
+         ondragover="onFilesDrag(event, false)" ondragleave="onFilesDrag(event, true)">
+      <!-- Breadcrumbs -->
+      <nav aria-label="breadcrumb">
+        <div class="row mt-2">
+          <div class="col">
+            <ol class="breadcrumb my-auto">
+              <li class="breadcrumb-item">
+                <a href="%{0- globals.url.base 0}/%{2= page.typeFront 2}/"><img
+                    src="%{0- globals.url.static 0}/img/feathericons/%{2- page.type == 'data' ? 'cloud' : 'trash-2' 2}.svg"
+                    width="24" height="24"
+                    alt="%{2- page.type == 'data' ? 'Meine Dateien' : 'Papierkorb' 2}"
+                    aria-label="%{2- page.type == 'data' ? 'Meine Dateien' : 'Papierkorb' 2}"></a>
+              </li>
+
+              %{2_ let currBreadPath = ''; _2}
+              %{2_ for (let i = 0; i < page.breadcrumb.length; ++i) { _2}
+              %{2_ const isActive = i + 1 == page.breadcrumb.length; _2}
+              %{2_ const value = page.breadcrumb[i]; _2}
+              %{2_ currBreadPath += `${value}/`; _2}
+
+              <li class="breadcrumb-item text-truncate %{2- isActive ? 'active' : '' _2}"
+                  aria-current="%{2- isActive ? 'page' : '' _2}">
+                %{2- !isActive ? `<a href="%{0- globals.url.base 0}/${page.typeFront}/${encodeURI(currBreadPath)}">` :
+                '' -2}
+                %{2= value -2}
+                %{2- !isActive ? '</a>' : '' _2}
+              </li>
+              %{2_ } _2}
+            </ol>
+          </div>
+
+          <div class="col-auto">
+            <div class="dropdown d-inline-block">
+              <button type="button" class="btn btn-sm btn-outline-dark rounded-pill dropdown-toggle"
+                      id="dropDownNew" data-bs-toggle="dropdown" aria-expanded="false"><!--
+             --><img src="%{0- globals.url.static 0}/img/feathericons/plus.svg" width="24" height="24" alt=""
+                     aria-hidden="true"><!--
+             -->&nbsp;Neu<!--
+           --></button>
+
+              <ul class="dropdown-menu cursor-pointer" aria-labelledby="dropDownNew">
+                <li><a class="dropdown-item" onclick="mkdirDialog()">Verzeichnis</a></li>
+              </ul>
+
+              <!-- Modal -->
+              <div class="modal fade" id="mkdirModal" tabindex="-1" aria-labelledby="mkdirModalTitle"
+                   aria-hidden="true" style="top: 10vh">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title" id="mkdirModalTitle">Verzeichnis erstellen</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+                      <form class="row" method="post" onsubmit="mkdirDialog(event)">
+                        <div class="col">
+                          <!--   <span class="input-group-text">/curr/path/.../</span>-->
+                          <input type="text" class="form-control" aria-label="Name of the directory to create"
+                                 required autocomplete="off" oninput="mkdirDialog(event)">
+                          <div class="invalid-feedback"></div>
+                        </div>
+
+                        <div class="col-auto">
+                          <button class="btn btn-primary" type="submit">Erstellen</button>
+                        </div>
+                      </form>
+
+                      <div class="alert alert-info d-none" role="alert"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <form class="d-inline" method="post" enctype="multipart/form-data" id="uploadForm"
+                  onsubmit="event.preventDefault(); return false;">
+              <noscript>
+                <div class="mb-3">
+                  <input type="file" class="form-control form-control-sm" name="fUpload" multiple required>
+                </div>
+              </noscript>
+
+              <button type="submit" class="btn btn-sm btn-outline-dark rounded-pill"><!--
+             --><img src="%{0- globals.url.static 0}/img/feathericons/upload-cloud.svg" width="24" height="24" alt=""
+                     aria-hidden="true"><!--
+             -->&nbsp;Hochladen<!--
+           --></button>
+            </form>
+
+            <!--            <form method="POST" enctype="multipart/form-data">-->
+            <!--              <div>-->
+            <!--                <label>Select your profile picture:</label>-->
+            <!--                <input type="file" name="profile_pic">-->
+            <!--              </div>-->
+
+            <!--              <div>-->
+            <!--                <input type="submit" name="btn_upload_profile_pic" value="Upload">-->
+            <!--              </div>-->
+            <!--            </form>-->
+
+            <span class="me-2 ms-2" style="border-left: 1px solid #212529"></span>
+
+            <span class="me-1 cursor-pointer" onclick="reloadFileTable()"><img
+                src="%{0- globals.url.static 0}/img/feathericons/refresh-cw.svg" width="24"
+                height="24" alt="Ansicht aktualisieren" aria-label="Ansicht aktualisieren"></span>
+
+            <a href="#" class="me-1"><img src="%{0- globals.url.static 0}/img/feathericons/grid.svg" width="24"
+                                          height="24"
+                                          alt="Darstellungsweise umstellen"
+                                          aria-label="Darstellungsweise umstellen"></a>
+
+            <a href="#"><img src="%{0- globals.url.static 0}/img/feathericons/info.svg" width="24" height="24"
+                             alt="Dateiinformationen anzeigen/ausblenden"
+                             aria-label="Dateiinformationen anzeigen/ausblenden"></a>
+          </div>
+        </div>
+      </nav>
+
+      <!-- File table -->
+      <div style="max-height: 78vh;overflow-y: auto">
+        <table class="table table-hover table-responsive" aria-label="Dateiliste" id="fileTable">
+          <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Änderungsdatum</th>
+          </tr>
+          </thead>
+
+          <tbody>
+          %{2_ for(const dir of page.directories) { _2}
+          <tr class="cursor-pointer"
+              data-href="%{0- globals.url.base 0}/%{2- encodeURI(dir.path) -2}/"
+              data-nas-filename="%{2= dir.name -2}"
+              data-nas-isFile="0">
+            <th scope="row">
+              <a href="%{0- globals.url.base 0}/%{2- encodeURI(dir.path) -2}/" class="d-block a-stealth">
+                <img src="%{0- globals.url.static 0}/img/feathericons/folder.svg" width="24" height="24" alt=""
+                     aria-hidden="true">&nbsp;%{2= dir.name _2}
+              </a>
+            </th>
+
+            <td>
+              <a href="%{0- globals.url.base 0}/%{2- encodeURI(dir.path) -2}/" class="d-block a-stealth">N/A</a>
+            </td>
+          </tr>
+          %{2_ } _2}
+
+          %{2_ for(const file of page.files) { _2}
+          <tr class="cursor-pointer"
+              data-href="%{0- globals.url.base 0}/%{2- encodeURI(file.path) -2}"
+              data-nas-download="%{0- globals.url.base 0}/%{2- encodeURI('download' + file.path.substring(file.path.indexOf('/'))) -2}?force=1"
+              data-nas-preview="%{0- globals.url.base 0}/%{2- encodeURI('preview/browse' + file.path.substring(file.path.indexOf('/'))) -2}"
+              data-nas-filename="%{2= file.name -2}"
+              data-nas-isFile="1">
+            <th scope="row">
+              <a href="%{0- globals.url.base 0}/%{2- encodeURI(file.path) -2}" class="d-block a-stealth">
+                <img src="%{0- globals.url.static 0}/img/feathericons/file.svg" width="24" height="24" alt=""
+                     aria-hidden="true">&nbsp;%{2= file.name _2}
+              </a>
+            </th>
+
+            <td>
+              <a href="%{0- globals.url.base 0}/%{2- encodeURI(file.path) -2}" class="d-block a-stealth">
+                <time datetime="%{2= file.modifyDate.toUTCString() -2}">%{2= file.modifyDate.toLocaleString('de-DE',
+                  {day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}); -2}
+                </time>
+              </a>
+            </td>
+          </tr>
+          %{2_ } _2}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Modal -->
+      <div class="modal fade" id="filePreviewModal" tabindex="-1" aria-labelledby="filePreviewModalTitle"
+           aria-hidden="true" style="top: 10vh">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="filePreviewModalTitle">Dateivorschau</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body" style="height: 60vh">
+              <iframe style="height: 100%;width: 100%"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right sidebar (file details) -->
+    <div class="col-auto mt-5 d-none" data-jsOnly>
+      <div class="container-fluid small" style="overflow: auto;max-height: 75vh;width: 20vw;" id="fileDetails">
+        <p class="text-center text-break fw-bold" id="fileDetailsName"><!-- No file selected --></p>
+
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="btnFileDetailsInfoTab" data-bs-toggle="tab"
+                    data-bs-target="#fileDetailsInfoTab" type="button" role="tab" aria-controls="fileDetailsInfoTab"
+                    aria-selected="true">
+              Info
+            </button>
+          </li>
+
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="btnFileDetailsMetaTab" data-bs-toggle="tab"
+                    data-bs-target="#fileDetailsMetaTab" type="button" role="tab" aria-controls="fileDetailsMetaTab"
+                    aria-selected="false">
+              Meta
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="fileDetailsInfoTab" role="tabpanel"
+               aria-labelledby="btnFileDetailsInfoTab">
+            <em>Wähle eine Datei aus der Liste</em>
+          </div>
+
+          <div class="tab-pane fade" id="fileDetailsMetaTab" role="tabpanel" aria-labelledby="btnFileDetailsMetaTab">
+            <em>Wähle eine Datei aus der Liste</em>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+
+<!-- Custom context menu -->
+<div class="dropdown" id="ctxMenu">
+  <ul class="dropdown-menu show">
+    <li>
+      <h6 class="dropdown-header"><!-- Filename --></h6>
+    </li>
+
+    <li data-ctx-action="%{2= page.type != 'trash' ? 'download-file' : '' 2}">
+      <span class="dropdown-item %{2= page.type == 'trash' ? 'disabled' : '' 2}">Download</span>
+    </li>
+
+    <li data-ctx-action="delete-file">
+      <span class="dropdown-item">Datei löschen</span>
+    </li>
+    <!-- <li><hr class="dropdown-divider"></li> -->
+
+    <li data-ctx-action="action3">
+      <span class="dropdown-item">Something else here</span>
+    </li>
+  </ul>
+</div>
+
+%{0- include('/_footer.html') -0}
+</body>
+</html>
