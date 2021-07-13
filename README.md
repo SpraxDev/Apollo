@@ -1,8 +1,14 @@
 # NAS-Web
 
+## Bugs
+
+* Videos ohne Videospur werfen fehler beim Thumbnail generieren
+
+## ToDo
+
 * File-Browser
-    * Mit Down- und Upload
-    * FileTypes werden am content ausgemacht und nicht an der File-Extension
+    * [x] Mit Down- und Upload
+    * [x] FileTypes werden am content ausgemacht und nicht an der File-Extension
     * Datei kann auf Viren geprüft werden
         * (optional) automatischer abgleich mit VirusTotal
     * File-Preview
@@ -12,12 +18,12 @@
               (Die Reihenfolge und Kompressionsstufe kann einen Hash beeinflussen was nicht immer gewünscht ist)
         * Previews werden für Media-Files im Vorfeld angelegt
             * Bilder
-                * low-res thumbnail
+                * [x] low-res thumbnail
                 * an optimized version with full-res preview (button für original Qualität)
             * Videos
                 * Werden in mehrere Formate gewandelt um besser gestreamt werden zu können
                     * Der in-browser Player supportet embedded subtitles
-* Dateien können um Webinterface „bearbeitet“ werden
+* Dateien können im Webinterface „bearbeitet“ werden
     * Extract Zip-Archives
     * Convert Videos into a specific format/resolution/...
 * User and Permission based

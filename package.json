@@ -13,6 +13,12 @@
     "email": "contact@sprax2013.de",
     "url": "https://github.com/SpraxDev"
   },
+  "contributors": [
+    {
+      "name": "NudelErde",
+      "url": "https://github.com/NudelErde"
+    }
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SpraxDev/NAS-Web.git"
@@ -21,14 +27,14 @@
     "url": "https://github.com/SpraxDev/NAS-Web/issues"
   },
   "main": "build/index.js",
+  "bin": "build/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
-    "start": "cross-env NODE_ENV=production nodemon --enable-source-maps build/index.js",
-    "dev": "nodemon --ext ts --watch ./src --exec \"npm run devStart\"",
-    "devStart": "cross-env NODE_ENV=development ts-node src/index.ts",
-    "devProd": "nodemon --ext ts --watch ./src --exec \"npm run devProdStart\"",
-    "devProdStart": "cross-env NODE_ENV=production ts-node src/index.ts"
+    "docker": "npm run build && echo \"Not implemented yet\" && exit 1",
+    "test-docker": "npm run docker && snyk container test nasweb --file=Dockerfile",
+    "start": "node --enable-source-maps build/index.js",
+    "dev": "nodemon --ext ts --watch ./src --exec \"ts-node src/index.ts\""
   },
   "os": [
     "linux"
@@ -41,19 +47,17 @@
     "ejs": "^3.1.6",
     "express": "^4.17.1",
     "express-session": "^1.17.2",
-    "fast-directory-size": "github:SpraxDev/fast-directory-size#semver:v2.1.0",
+    "fast-directory-size": "github:SpraxDev/fast-directory-size#semver:v2.2.1",
     "ffmpeg-static": "^4.3.0",
     "ffprobe": "^1.1.2",
     "ffprobe-static": "^3.0.0",
     "flake-idgen": "^1.4.0",
     "mime-types": "^2.1.31",
-    "moment": "^2.29.1",
     "morgan": "^1.10.0",
     "multer": "^1.4.2",
-    "nodemon": "^2.0.7",
     "object-assign-deep": "^0.4.0",
     "pg": "^8.6.0",
-    "prismjs": "^1.23.0",
+    "redis": "^3.1.2",
     "rotating-file-stream": "^2.1.5",
     "sharp": "^0.28.3",
     "superagent": "^6.1.0"
@@ -73,11 +77,14 @@
     "@types/multer": "^1.4.5",
     "@types/node": "14.x",
     "@types/object-assign-deep": "^0.4.0",
-    "@types/prismjs": "^1.16.5",
+    "@types/redis": "^2.8.31",
     "@types/sharp": "^0.28.3",
     "@types/superagent": "^4.1.11",
-    "cross-env": "^7.0.3",
+    "nodemon": "^2.0.7",
     "ts-node": "^10.0.0",
     "typescript": "^4.3.2"
+  },
+  "nodemonConfig": {
+    "signal": "SIGINT"
   }
 }

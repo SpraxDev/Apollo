@@ -2,7 +2,8 @@
   "extends": "@tsconfig/node14/tsconfig.json",
   "compilerOptions": {
     "sourceMap": true,
-    "outDir": "./build"
+    "outDir": "./build",
+    "moduleResolution": "Node"
   },
   "include": [
     "src/**/*.ts"

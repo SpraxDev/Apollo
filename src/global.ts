@@ -17,6 +17,7 @@ export interface IConfig {
     readonly github: {
       readonly client_id: string;
       readonly client_secret: string;
+      readonly redirectUri: string;
     }
   };
 
@@ -29,6 +30,7 @@ export interface IConfig {
     }
 
     readonly serveStatic: boolean;
+    readonly trustProxy: boolean;
 
     readonly urlPrefix: {
       readonly https: boolean;
@@ -48,6 +50,16 @@ export interface IConfig {
     readonly password: string;
 
     readonly database: string;
+  };
+
+  readonly redis: {
+    readonly enabled: boolean;
+
+    readonly host: string;
+    readonly port: number;
+
+    readonly db: number;
+    readonly password: string;
   };
 
   readonly cookies: {
@@ -101,6 +113,7 @@ export interface PreviewPageData extends IPageData {
       readonly mimeType: string;
 
       readonly downloadPath: string;
+      readonly livePath: string;
 
       readonly alternatives: Array<{
         readonly mimeType: string;
@@ -120,6 +133,7 @@ export interface LivePageData extends IPageData {
 
     readonly hls: {
       readonly master: string;
+      readonly masterUnauthorized: string;
     }
   };
 }

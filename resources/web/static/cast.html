@@ -1,0 +1,63 @@
+<html>
+<head>
+  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+
+  <style>
+      /*.background {*/
+      /*    background: aqua url(img/noimgsmol.png) no-repeat center;*/
+      /*}*/
+
+      .logo {
+          background-image: url(img/favicon/android-chrome-512x512.png);
+          color:            red;
+      }
+
+      /*.progressBar {*/
+      /*    background-color: rgb(238, 255, 65);*/
+      /*}*/
+
+      /*.splash {*/
+      /*    background-image: url(img/favicon/android-chrome-512x512.png);*/
+      /*}*/
+
+      /*.watermark {*/
+      /*    background-image: url(img/favicon/android-chrome-512x512.png);*/
+      /*    background-size:  57px 57px;*/
+      /*}*/
+  </style>
+</head>
+<body>
+
+<cast-media-player></cast-media-player>
+
+<script>
+  const context = cast.framework.CastReceiverContext.getInstance();
+  const playerManager = context.getPlayerManager();
+
+  // intercept the LOAD request
+  playerManager.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, loadRequestData => {
+    console.log(`Loading '${loadRequestData.media.contentUrl || loadRequestData.media.contentId}' (${loadRequestData.media.contentType})`);
+    // console.log('loadRequestData:', JSON.stringify(loadRequestData, null, 4));
+    // console.log('With category:',loadRequestData.media.mediaCategory);
+    // console.log('With metadata:',loadRequestData.media.metadata);
+
+    if (loadRequestData.media.contentType === 'application/x-mpegURL') {
+      loadRequestData.media.hlsSegmentFormat = cast.framework.messages.HlsSegmentFormat.TS_AAC;
+      loadRequestData.media.hlsVideoSegmentFormat = cast.framework.messages.HlsVideoSegmentFormat.MPEG2_TS;
+      loadRequestData.media.streamType = cast.framework.messages.StreamType.LIVE;
+    }
+
+    return loadRequestData;
+  });
+
+  // playerManager.addEventListener(cast.framework.events.category.CORE, event => console.log('Core event: ', JSON.stringify(event, null, 4)));
+  // playerManager.addEventListener(cast.framework.events.EventType.MEDIA_STATUS, event => console.log('MEDIA_STATUS event: ', JSON.stringify(event, null, 4)));
+  // playerManager.addEventListener(cast.framework.events.EventType.BITRATE_CHANGED, event => console.log('BITRATE_CHANGED event:', JSON.stringify(event, null, 4)));
+  playerManager.addEventListener(cast.framework.events.EventType.ERROR, event => console.log('ERROR event:', JSON.stringify(event, null, 4)));
+
+  context.setLoggerLevel(cast.framework.LoggerLevel.DEBUG);
+
+  context.start();
+</script>
+</body>
+</html>

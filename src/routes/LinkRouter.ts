@@ -3,12 +3,13 @@ import FlakeId from 'flake-idgen';
 import path from 'path';
 import { NasUser } from '../global';
 import { NasUtils } from '../utils/NasUtils';
-import { WebServer } from '../WebServer';
 
 const flakeId = new FlakeId();
 
 type LinkData = {
   user: NasUser['id'];
+  anyoneCanAccess: boolean;
+
   absPath: string;
   created: number;
   ttl?: number;
@@ -17,10 +18,10 @@ type LinkData = {
 export class LinkRouter {
   private static links: { [key: string]: LinkData } = {};
 
-  static getRouter() {
+  static getRouter(isUserExpectedToBeAuthenticated: boolean) {
     const router = Router();
 
-    router.use(this.getHandler());
+    router.use(this.getHandler(isUserExpectedToBeAuthenticated));
 
     return router;
   }
@@ -35,12 +36,13 @@ export class LinkRouter {
     return null;
   }
 
-  static searchLink(user: NasUser, absPath: string): { key: string, data: LinkData } | null {
+  static searchLink(user: NasUser, absPath: string, anyoneCanAccess: boolean = false): { key: string, data: LinkData } | null {
     for (const linkKey in this.links) {
       const linkData = this.links[linkKey];
 
       if (linkData.user == user.id &&
           linkData.absPath == absPath &&
+          linkData.anyoneCanAccess == anyoneCanAccess &&
           this.isValidLink(linkKey)) {
         return {key: linkKey, data: linkData};
       }
@@ -49,8 +51,8 @@ export class LinkRouter {
     return null;
   }
 
-  static getOrCreateLink(user: NasUser, absPath: string, ttlInSeconds?: number): string {
-    const link = this.searchLink(user, absPath);
+  static getOrCreateLink(user: NasUser, absPath: string, anyoneCanAccess: boolean = false, ttlInSeconds?: number): string {
+    const link = this.searchLink(user, absPath, anyoneCanAccess);
     if (link) {
       return link.key;
     }
@@ -60,6 +62,8 @@ export class LinkRouter {
     // TODO: Validate path to be within NasWeb working directory just to be safe
     this.links[id] = {
       user: user.id,
+      anyoneCanAccess,
+
       absPath,
       created: Date.now(),
       ttl: ttlInSeconds != undefined ? ttlInSeconds * 1000 : undefined
@@ -86,15 +90,14 @@ export class LinkRouter {
     return false;
   }
 
-  private static getHandler(): (req: Request, res: Response, next: NextFunction) => void {
+  /**
+   * This handler can be called WITHOUT a user being logged in
+   */
+  private static getHandler(isUserExpectedToBeAuthenticated: boolean): (req: Request, res: Response, next: NextFunction) => void {
     return (req, res, next) => {
-      if (!WebServer.isLoggedIn(req) || req.session.user?.id == undefined) {
-        return next(new Error('User is not authenticated'));
-      }
-
       res.setHeader('Access-Control-Allow-Origin', '*');
 
-      const user = req.session.user;
+      const user = req.session?.user;
 
       try {
         const linkId = req.path.substring(1, req.path.indexOf('/', 1));
@@ -102,7 +105,7 @@ export class LinkRouter {
         const linkData = this.getLink(linkId);
 
         if (linkData) {
-          if (linkData.user == user.id) {
+          if (linkData.anyoneCanAccess || linkData.user == user?.id) {
             const absPath = path.normalize(path.join(linkData.absPath, req.path.substring(req.path.indexOf(linkId) + linkId.length)));
             const isDirectory = NasUtils.isDirectory(absPath);
 
@@ -115,19 +118,35 @@ export class LinkRouter {
             } else {
               NasUtils.fetchFile(absPath)
                   .then((file) => {
+                    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept-Encoding, Range, Accept');
+                    res.header('Access-Control-Allow-Origin', req.header('Origin') || '*');
+                    if (req.header('Origin')) {
+                      res.header('Vary', 'Origin');
+                    }
+
+                    if (path.basename(absPath).endsWith('.m3u8')) {
+                      file.mime = 'application/x-mpegURL';
+                    }
+
                     res
                         .type(file.mime || 'application/octet-stream')
                         .sendFile(absPath, (err) => {
-                          if (err && err.message != 'Request aborted') next(err);
+                          if (err && err.message != 'Request aborted' && err.message != 'write EPIPE') next(err);
                         });
                   })
                   .catch(next);
             }
+          } else if (!linkData.anyoneCanAccess) {
+            return next(isUserExpectedToBeAuthenticated ? new Error('User is not authenticated') : undefined);
           } else {
-            return next(new Error('User does not have access to this link'));
+            return next(isUserExpectedToBeAuthenticated ? new Error('User does not have access to this link') : undefined);
           }
         } else {
-          res.status(404).send(this.links);
+          if (isUserExpectedToBeAuthenticated) {
+            return next();
+          } else {
+            res.sendStatus(404);
+          }
         }
       } catch (err) {
         next(err);

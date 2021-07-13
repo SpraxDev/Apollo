@@ -40,7 +40,7 @@ export class DownloadRouter {
                     res
                         .type(file.mime || 'application/octet-stream')
                         .sendFile(absPath, (err) => {
-                          if (err && err.message != 'Request aborted') next(err);
+                          if (err && err.message != 'Request aborted' && err.message != 'write EPIPE') next(err);
                         });
                   })
                   .catch(next);

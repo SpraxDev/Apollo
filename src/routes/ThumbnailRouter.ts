@@ -1,14 +1,10 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import path, { join as joinPath } from 'path';
-import sharp from 'sharp';
+import { getCacheUtils } from '../index';
+import { HttpError } from '../utils/HttpError';
 import { NasUtils } from '../utils/NasUtils';
 import { Utils } from '../utils/Utils';
 import { WebServer } from '../WebServer';
-
-const sharpTypes = [
-  'application/pdf', 'image/bmp', 'image/gif', 'image/jpeg',
-  'image/png', 'image/svg+xml', 'image/tiff', 'image/webp'
-];
 
 // Use https://github.com/ideawu/ssdb as thumbnail cache
 export class ThumbnailRouter {
@@ -47,69 +43,50 @@ export class ThumbnailRouter {
 
           if (sizeStr) {
             if (typeof sizeStr != 'string' || !Utils.isNumeric(sizeStr)) {
-              return res.status(400)
+              res.status(400)
                   .send(`Only numeric values are allowed for the query-param 'size'`);
+              return;
             }
 
             size = parseInt(sizeStr);
 
             if (size > 2000) {
-              return res.status(400)
+              res.status(400)
                   .send(`Thumbnails can currently not exceed a size of 2000px`);
+              return;
             }
           }
 
-          NasUtils.fetchFile(absPath)
-              .then(async (file): Promise<void> => {
-                if (file.mime) {
-                  if (sharpTypes.includes(file.mime)) {
-                    sharp(absPath, {
-                      failOnError: false,
-                      sequentialRead: true,
-                      density: 500
-                    })
-                        .on('error', (err) => {
-                          res.status(400)
-                              .send(`The given file seems to be corrupted or invalid (${err.message})`);
-                        })
-                        .resize(size, size, {
-                          // fit: 'cover',
-                          // position: 'attention',
-                          fit: 'inside',
-                          fastShrinkOnLoad: true,
-                          withoutEnlargement: true
-                        })
-                        .png()
-                        .pipe(res);
-                  } else if (file.mime.startsWith('video/')) {
-                    const thumbnail = await NasUtils.extractVideoThumbnail(absPath);
-
-                    thumbnail.img
-                        .resize(size, size, {
-                          fit: 'inside',
-                          fastShrinkOnLoad: true,
-                          withoutEnlargement: true
-                        })
-                        .png()
-                        .pipe(res);
-
-                    res.on('close', thumbnail.done);
-                  } else {
-                    res.status(415)
-                        .type('png')
-                        .sendFile(this.FALLBACK_IMG_PATH, (err) => {
-                          if (err && err.message != 'Request aborted') next(err);
-                        });
-                  }
+          getCacheUtils()
+              .getThumbnail(user, absPath, size)
+              .then(thumbnail => {
+                if (thumbnail) {
+                  res.status(200)
+                      .type(thumbnail.mime)
+                      .send(thumbnail.data);
                 } else {
-                  res.status(415)
-                      .type('png')
-                      .sendFile(this.FALLBACK_IMG_PATH, (err) => {
-                        if (err && err.message != 'Request aborted') next(err);
-                      });
+                  res.status(404)
+                      .type('txt')
+                      .send('Could not generate a thumbnail for the given file (does it exist?)');
                 }
               })
-              .catch(next);
+              .catch((err) => {
+                if (err instanceof HttpError) {
+                  res.status(err.httpCode);
+
+                  if (err.httpCode == 415) {
+                    res.type('png')
+                        .sendFile(this.FALLBACK_IMG_PATH, (err) => {
+                          if (err && err.message != 'Request aborted' && err.message != 'write EPIPE') next(err);
+                        });
+                  } else {
+                    res.type('txt')
+                        .send(err.message);
+                  }
+                } else {
+                  next(err);
+                }
+              });
         }
       } catch (err) {
         next(err);

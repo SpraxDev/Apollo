@@ -12,7 +12,8 @@ import {
 import { createServer, Server } from 'http';
 import morgan from 'morgan';
 import { join as joinPath } from 'path';
-import { config, database, runningInProduction, webAccessLogStream } from './index';
+import * as rfs from 'rotating-file-stream';
+import { config, getDatabase, runningInProduction } from './index';
 import { PageGenerator } from './PageGenerator';
 import { BrowseRouter } from './routes/BrowseRouter';
 import { DownloadRouter } from './routes/DownloadRouter';
@@ -21,7 +22,9 @@ import { LiveRouter } from './routes/LiveRouter';
 import { LoginRouter } from './routes/LoginRouter';
 import { PreviewRouter } from './routes/PreviewRouter';
 import { ThumbnailRouter } from './routes/ThumbnailRouter';
+import { NasUtils } from './utils/NasUtils';
 import { ServerTiming } from './utils/ServerTiming';
+import { Utils } from './utils/Utils';
 
 export class WebServer {
   readonly pageGenerator;
@@ -33,7 +36,7 @@ export class WebServer {
 
     this.expressApp = express();
     this.expressApp.disable('x-powered-by');
-    this.expressApp.set('trust proxy', false);  // TODO REMOVE DEBUG
+    this.expressApp.set('trust proxy', config.data.web.trustProxy);
 
     // Prepare Server-Timings
     this.expressApp.use(ServerTiming.getExpressMiddleware(!runningInProduction));
@@ -58,11 +61,11 @@ export class WebServer {
     // Setup session handler
     this.expressApp.use(expressSession({
       name: 'sessID',
-      store: database?.isAvailable() ?
+      store: getDatabase()?.isAvailable() ?
           new (expressSessionPG(expressSession))({
             tableName: 'sessions',
             pruneSessionInterval: 24 * 60 * 60, /* 24h */
-            pool: database.getPool() ?? undefined
+            pool: getDatabase()?.getPool() ?? undefined
           })
           : undefined,
       secret: config.data.secret,
@@ -74,7 +77,7 @@ export class WebServer {
         secure: config.data.cookies.secure,
         httpOnly: true,
         sameSite: 'lax',
-        maxAge: database?.isAvailable() ? 30 * 24 * 60 * 60 * 1000 /* 30d */ : 30 * 60 * 1000 /* 30min */
+        maxAge: getDatabase()?.isAvailable() ? 30 * 24 * 60 * 60 * 1000 /* 30d */ : 30 * 60 * 1000 /* 30min */
       }
     }));
 
@@ -132,19 +135,10 @@ export class WebServer {
         mkdirSync(parentDir, {recursive: true});
       }
 
-      const isProcessRunning = (pid: number): boolean => {
-        try {
-          process.kill(pid, 0);
-          return true;
-        } catch (ex) {
-          return ex.code == 'EPERM';
-        }
-      };
-
       if (fileExistsSync(unixSocketPath)) {
         let isRunning: boolean = false;
         let runningPID: number = -1;
-        if (!fileExistsSync(unixSocketPIDPath) || !(isRunning = isProcessRunning(runningPID = parseInt(readFileSync(unixSocketPIDPath, 'utf-8'))))) {
+        if (!fileExistsSync(unixSocketPIDPath) || !(isRunning = Utils.isProcessRunning(runningPID = parseInt(readFileSync(unixSocketPIDPath, 'utf-8'))))) {
           unlinkFileSync(unixSocketPath);
         }
 
@@ -170,6 +164,27 @@ export class WebServer {
   }
 
   private setupLoggingRoutes() {
+    const webAccessLogStream = rfs.createStream('access.log', {
+      interval: '1d',
+      maxFiles: 7,
+      path: joinPath(NasUtils.getTmpDir('webLogs').path, 'access'),
+      compress: true
+    });
+    webAccessLogStream.on('error', (err) => {
+      console.error(500, 'webAccessLogStream called error-event', true, {err});
+      // ApiError.log(500, 'webAccessLogStream called error-event', true, {err});
+    });
+
+    const errorLogStream = rfs.createStream('error.log', {
+      interval: '1d',
+      maxFiles: 90,
+      path: joinPath(NasUtils.getTmpDir('webLogs').path, 'error')
+    });
+    errorLogStream.on('error', (err) => {
+      console.error(500, 'errorLogStream called error-event', true, {err});
+      // ApiError.log(500, 'errorLogStream called error-event', true, {err});
+    });
+
     this.expressApp.use(morgan('[:date[web]] :remote-addr by :remote-user | :method :url :status with :res[content-length] bytes | ":user-agent" referred from ":referrer" | :response-time[3] ms',
         {stream: webAccessLogStream}));
 
@@ -185,6 +200,8 @@ export class WebServer {
     if (config.data.web.serveStatic) {
       this.expressApp.use(express.static(joinPath(__dirname, '..', 'resources', 'web', 'static')));
     }
+
+    this.expressApp.use('/link', LinkRouter.getRouter(false));
   }
 
   private setupNormalRoutes() {
@@ -208,7 +225,7 @@ export class WebServer {
     this.expressApp.use('/thumbnail', ThumbnailRouter.getRouter());
     this.expressApp.use('/preview', PreviewRouter.getRouter(this.pageGenerator));
     this.expressApp.use('/live', LiveRouter.getRouter(this.pageGenerator));
-    this.expressApp.use('/link', LinkRouter.getRouter());
+    this.expressApp.use('/link', LinkRouter.getRouter(true));
   }
 
   private setupErrorHandling() {
@@ -255,7 +272,7 @@ export class WebServer {
   }
 
   public static isLoggedIn(req: express.Request): boolean {
-    if (database?.isAvailable()) {
+    if (getDatabase()?.isAvailable()) {
       return !!req.session?.user;
     }
 

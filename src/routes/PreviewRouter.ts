@@ -48,6 +48,7 @@ export class PreviewRouter {
               .then((file) => {
                 if (file.mime) {
                   const downloadPath = `/download${req.path.substring(req.path.indexOf('/', 1))}`;
+                  const livePath = `/live/browse${req.path.substring(req.path.indexOf('/', 1))}`;
 
                   if (file.mime.startsWith('text/')) {
                     const pageData: PreviewPageData = {
@@ -58,6 +59,7 @@ export class PreviewRouter {
                           name: path.basename(absPath),
                           mimeType: file.mime,
                           downloadPath,
+                          livePath,
                           alternatives: []
                         }
                       }
@@ -76,6 +78,7 @@ export class PreviewRouter {
                           name: path.basename(absPath),
                           mimeType: file.mime,
                           downloadPath,
+                          livePath,
                           alternatives: []
                         }
                       }

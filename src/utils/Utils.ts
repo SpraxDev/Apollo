@@ -1,7 +1,21 @@
+import crypto from 'crypto';
 import { Request, Response } from 'express';
 import * as fs from 'fs';
 
 export class Utils {
+  static isProcessRunning(pid: number): boolean {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (ex) {
+      return ex.code == 'EPERM';
+    }
+  }
+
+  static sleep(millis: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, millis));
+  }
+
   static isNumeric(str: string): boolean {
     return /^[0-9]+$/.test(str);
   }
@@ -24,6 +38,20 @@ export class Utils {
     }
 
     return Buffer.from(data);
+  }
+
+  static async hashFileHead(absPath: string, options?: { algorithm?: string, bytes?: number, prefixData?: string | Buffer }): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash(options?.algorithm ?? 'sha256');
+
+      if (options?.prefixData) {
+        hash.update(options?.prefixData);
+      }
+
+      fs.createReadStream(absPath, {start: 0, end: options?.bytes ?? 16 * 1024 * 1024 /* 16MiB */})
+          .on('data', (chunk) => hash.update(chunk))
+          .on('end', () => resolve(hash.digest('hex')));
+    });
   }
 
   /**

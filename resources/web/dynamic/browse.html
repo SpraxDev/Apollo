@@ -26,6 +26,20 @@
 </header>
 
 <main>
+  <!-- Modal -->
+  <div class="modal fade" id="modal" tabindex="-1" aria-labelledby="ModalTitle" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="ModalTitle"><!-- Title --></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body"><!-- Body --></div>
+      </div>
+    </div>
+  </div>
+
   <div class="row w-100">
     <!-- Left sidebar -->
     <div class="col-auto mt-5">
@@ -93,38 +107,7 @@
               <ul class="dropdown-menu cursor-pointer" aria-labelledby="dropDownNew">
                 <li><a class="dropdown-item" onclick="mkdirDialog()">Verzeichnis</a></li>
               </ul>
-
-              <!-- Modal -->
-              <div class="modal fade" id="mkdirModal" tabindex="-1" aria-labelledby="mkdirModalTitle"
-                   aria-hidden="true" style="top: 10vh">
-                <div class="modal-dialog">
-                  <div class="modal-content">
-                    <div class="modal-header">
-                      <h5 class="modal-title" id="mkdirModalTitle">Verzeichnis erstellen</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-
-                    <div class="modal-body">
-                      <form class="row" method="post" onsubmit="mkdirDialog(event)">
-                        <div class="col">
-                          <!--   <span class="input-group-text">/curr/path/.../</span>-->
-                          <input type="text" class="form-control" aria-label="Name of the directory to create"
-                                 required autocomplete="off" oninput="mkdirDialog(event)">
-                          <div class="invalid-feedback"></div>
-                        </div>
-
-                        <div class="col-auto">
-                          <button class="btn btn-primary" type="submit">Erstellen</button>
-                        </div>
-                      </form>
-
-                      <div class="alert alert-info d-none" role="alert"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
-
 
             <form class="d-inline" method="post" enctype="multipart/form-data" id="uploadForm"
                   onsubmit="event.preventDefault(); return false;">
@@ -294,8 +277,20 @@
       <span class="dropdown-item %{2= page.type == 'trash' ? 'disabled' : '' 2}">Download</span>
     </li>
 
+    <li data-ctx-action="%{2= page.type != 'trash' ? 'rename-file' : '' 2}">
+      <span class="dropdown-item %{2= page.type == 'trash' ? 'disabled' : '' 2}">Datei umbenennen</span>
+    </li>
+
     <li data-ctx-action="delete-file">
       <span class="dropdown-item">Datei löschen</span>
+    </li>
+
+    <li>
+      <hr class="dropdown-divider">
+    </li>
+
+    <li data-ctx-action="%{2= page.type != 'trash' ? 'ffmpeg' : '' 2}">
+      <span class="dropdown-item">Transcode with ffmpeg</span>
     </li>
     <!-- <li><hr class="dropdown-divider"></li> -->
 

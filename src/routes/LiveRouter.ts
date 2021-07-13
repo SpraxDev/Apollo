@@ -3,13 +3,14 @@ import path from 'path';
 import { LivePageData } from '../global';
 import { PageGenerator, PageType } from '../PageGenerator';
 import { NasUtils } from '../utils/NasUtils';
+import { ProcessData } from '../utils/ProcessManager';
 import { Utils } from '../utils/Utils';
 import { VideoUtils } from '../utils/VideoUtils';
 import { WebServer } from '../WebServer';
 import { LinkRouter } from './LinkRouter';
 
 const additionalSupportedTypes = [/*'application/pdf', 'application/ogg'*/];
-const liveEncodings: { [key: string]: { m3u8Path: string } } = {};
+const liveEncodings: { [key: string]: { m3u8Path: string, processData: ProcessData } } = {};
 
 export class LiveRouter {
   static getRouter(pageGenerator: PageGenerator) {
@@ -55,12 +56,18 @@ export class LiveRouter {
                       // file.mime.startsWith('audio/') ||
                       file.mime.startsWith('video/') /*||
                       additionalSupportedTypes.includes(file.mime)*/) {
+                    console.log(`User #${user.id} (${user.name}) requested live transcoding.`);
+
                     if (!liveEncodings[absPath]) {
-                      liveEncodings[absPath] = await VideoUtils.liveEncodeVideo(absPath);
+                      liveEncodings[absPath] = await VideoUtils.liveTranscodeVideo(absPath);
+                      console.log(`New live transcoding task started (log: ${liveEncodings[absPath].processData.logStream.path})...`);
+                    } else {
+                      console.log(`Found already existing transcode for user #${user.id} (${user.name}) that can be used.`);
                     }
 
                     const live = liveEncodings[absPath];
                     const liveDirLinkId = LinkRouter.getOrCreateLink(user, path.dirname(live.m3u8Path));
+                    const liveDirLinkUnauthorizedId = LinkRouter.getOrCreateLink(user, path.dirname(live.m3u8Path), true);
 
                     const pageData: LivePageData = {
                       user,
@@ -72,7 +79,8 @@ export class LiveRouter {
                         },
 
                         hls: {
-                          master: `/link/${liveDirLinkId}/${path.basename(live.m3u8Path)}`
+                          master: `/link/${liveDirLinkId}/${path.basename(live.m3u8Path)}`,
+                          masterUnauthorized: `/link/${liveDirLinkUnauthorizedId}/${path.basename(live.m3u8Path)}`
                         }
                       }
                     };

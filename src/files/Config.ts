@@ -23,7 +23,8 @@ export class Config extends File {
       oauth: {
         github: {
           client_id: '',
-          client_secret: ''
+          client_secret: '',
+          redirectUri: 'http://localhost:8092/login/github'
         }
       },
 
@@ -38,6 +39,13 @@ export class Config extends File {
         database: 'nas_web'
       },
 
+      redis: {
+        enabled: false,
+        host: '127.0.0.1',
+        port: 6379,
+        password: '',
+        db: 0
+      },
 
       web: {
         listen: {
@@ -48,6 +56,7 @@ export class Config extends File {
         },
 
         serveStatic: true,
+        trustProxy: false,
 
         urlPrefix: {
           https: false,

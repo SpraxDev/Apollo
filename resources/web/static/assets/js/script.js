@@ -1,5 +1,8 @@
 'use strict';
 
+// FIXME: Kinda hacky way to temporarily fix Double-Click on mobile
+const userAgentHasTouchScreen = () => 'ontouchstart' in document.documentElement || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+
 const notifier = new AWN({
   icons: false,
   durations: {
@@ -27,7 +30,194 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 });
 
-let mkdirModalElem, mkdirModal;
+let modalElem, modal, modalTooltips = [];
+
+/**
+ * @param {'mkdir' | 'ffmpeg'} type
+ * @param {any} data
+ */
+function prepareModal(type, data) {
+  for (const tooltip of modalTooltips) {
+    tooltip.dispose();
+  }
+  modalTooltips.splice(0);  // Clear array
+
+  if (type === 'mkdir') {
+    document.getElementById('ModalTitle').innerText = 'Verzeichnis erstellen';
+
+    modalElem.querySelector('.modal-body').innerHTML =
+        `<form class="row" method="post" onsubmit="mkdirDialog(event)">
+           <div class="col">
+             <!--   <span class="input-group-text">/curr/path/.../</span>-->
+             <input type="text" class="form-control" aria-label="Name of the directory to create"
+                    required autofocus autocomplete="off" oninput="mkdirDialog(event)">
+             <div class="invalid-feedback"></div>
+           </div>
+  
+           <div class="col-auto">
+             <button class="btn btn-primary" type="submit">Erstellen</button>
+           </div>
+        </form>
+
+        <div class="alert alert-info d-none" role="alert"></div>`;
+  } else if (type === 'ffmpeg') {
+    document.getElementById('ModalTitle').innerText = 'Gefundene Streams';
+
+    let modalHtml = '';
+
+    const pendingTooltips = [];
+
+    if (data) {
+      modalHtml += '<form method="post">';
+
+      for (const dataKey in data.streams) {
+        if (data.streams.hasOwnProperty(dataKey)) {
+          const streamArray = data.streams[dataKey];
+
+          modalHtml += `<strong>${dataKey.charAt(0).toUpperCase() + dataKey.substring(1)}</strong>`;
+          for (const s of streamArray) {
+            let tooltipHtml = `<b><u>Stream #${s.id}</u></b><br><br>`;
+
+            if (s.meta) {
+              tooltipHtml += `<b><u>Meta</u></b><br>`;
+
+              for (const tagKey in s.meta) {
+                if (s.meta.hasOwnProperty(tagKey)) {
+                  const tagValue = s.meta[tagKey];
+
+                  tooltipHtml += `<b>${sanitizeHtmlTags(tagKey)}</b>: ${sanitizeHtmlTags(tagValue)}<br>`;
+                }
+              }
+
+              tooltipHtml = tooltipHtml.replace(/"/g, '\\"');
+            }
+
+            let streamLang, streamTitle = `Stream #${s.id}`;
+
+            if (s.tags) {
+              if (!tooltipHtml.trimEnd().endsWith('<br>')) {
+                tooltipHtml += '<br><br>';
+              }
+
+              tooltipHtml += `<b><u>Tags</u></b><br>`;
+
+              for (const tagKey in s.tags) {
+                if (s.tags.hasOwnProperty(tagKey)) {
+                  const tagValue = s.tags[tagKey];
+
+                  if (tagValue) {
+                    if (tagKey === 'language') {
+                      streamLang = tagValue;
+                      continue;
+                    } else if (tagKey === 'title') {
+                      streamTitle = tagValue;
+                      continue;
+                    } else if (tagKey === 'filename' && !s.tags['title']) {
+                      streamTitle = `<b>Attachment</b>: <em>${s.tags['filename']}</em>`;
+                      continue;
+                    }
+                  }
+
+                  tooltipHtml += `<b>${sanitizeHtmlTags(tagKey)}</b>: ${sanitizeHtmlTags(tagValue)}<br>`;
+                }
+              }
+
+              if (dataKey === 'video') {
+                streamTitle += ` (${s.width}x${s.height})`;
+              }
+
+              tooltipHtml = tooltipHtml.replace(/"/g, '\\"');
+            }
+
+            modalHtml += `<div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="modalBody_stream_${s.id}" ${dataKey === 'unsupported' ? 'disabled' : ''}>
+                            <label class="form-check-label" for="modalBody_stream_${s.id}" id="modalBody_stream_${s.id}_label"
+                                   data-bs-toggle="tooltip" data-bs-html="true" data-bs-placement="right">
+                              ${streamTitle}${streamLang ? ` (${streamLang})` : ''}
+                            </label>
+                          </div>`;
+
+            if (dataKey === 'subtitle') {
+              modalHtml += `<div class="form-check form-switch">
+                              <input class="form-check-input" type="checkbox" id="modalBody_stream_${s.id}_hardSub">
+                              <label class="form-check-label" for="modalBody_stream_${s.id}_hardSub">HardSub</label>
+                            </div>
+                            <br>`;
+            }
+
+            pendingTooltips.push({id: `modalBody_stream_${s.id}_label`, title: tooltipHtml});
+          }
+
+          if (!modalHtml.trimEnd().endsWith('<br>')) {
+            modalHtml += '<br>';
+          }
+        }
+      }
+
+      modalHtml += '<hr>';
+      modalHtml += '<button class="btn btn-primary" type="send">Send</button>';
+
+      modalHtml += '</form>';
+    }
+
+    modalElem.querySelector('.modal-body').innerHTML = modalHtml;
+    modalElem.querySelector('.modal-body form').onsubmit = (e) => {
+      e.preventDefault();
+
+      const options = {};
+
+      modalElem.querySelector('.modal-body form')
+          .querySelectorAll('input')
+          .forEach((inputElem) => {
+            const key = inputElem.id.substring(inputElem.id.indexOf('_', inputElem.id.indexOf('_') + 1) + 1);
+            const value = inputElem.type === 'checkbox' ? inputElem.checked : inputElem.value;
+
+            if (value !== false) {
+              options[key] = value;
+            }
+          });
+
+      fetch(data.fileURI, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({action: 'ffmpeg', options})
+      })
+          .then(httpRes => {
+            if (httpRes.status === 200) {
+              return httpRes.json();
+            } else {
+              throw new Error(`Server returned status ${httpRes.status}`);
+            }
+          })
+          .then(body => {
+            console.log('ffmpeg result:', body);
+
+            if (body.message) {
+              notifier.warning(body.message);
+            }
+
+            reloadFileTable();
+          })
+          .catch(err => {
+            notifier.alert(`Beim Erstellen des Verzeichnisses ist ein kritischer Fehler aufgetreten: <code>${err.message}</code>`);
+            console.error('Error while creating a directory:', err);
+          })
+          .finally(() => {
+            modal.hide();
+            // TODO: disable and un-disable the 'New' button
+          });
+    };
+
+    for (const tooltip of pendingTooltips) {
+      modalTooltips.push(new bootstrap.Tooltip(document.getElementById(tooltip.id), {title: tooltip.title}));
+    }
+  } else {
+    throw new Error('Unknown modal type');
+  }
+}
 
 async function onLoadAsync() {
   /* Setup upload button */
@@ -111,10 +301,11 @@ async function onLoadAsync() {
         // 'Disable' all a-tags
         elem.querySelectorAll('a').forEach((a) => a.style.pointerEvents = 'none');
 
+        // TODO: Use event 'dblclick' instead
         elem.addEventListener('click', () => {
           const fileMeta = extractFileMetaFromEntry(elem);
 
-          if (lastClickElement === elem && lastClick !== -1 && Date.now() - lastClick <= 550) {
+          if (userAgentHasTouchScreen() || (lastClickElement === elem && lastClick !== -1 && Date.now() - lastClick <= 550)) {
             if (fileMeta.isFile) {
               filePreviewIFrame.src = fileMeta.previewUrl;
               filePreviewModal.show();
@@ -192,6 +383,9 @@ async function onLoadAsync() {
         const fileMeta = extractFileMetaFromEntry(lastClickElement);
 
         switch (action) {
+          case 'download-file':
+            location.href = fileMeta.downloadUrl;
+            break;
           case 'delete-file':
             notifier.confirm(`Bist du sicher, dass du <strong>${fileMeta.name}</strong>${browsePageCfg.typeFront === 'trash' ? ' <em>PERMANENT</em>' : ''} löschen möchtest?`,
                 () => {
@@ -218,8 +412,66 @@ async function onLoadAsync() {
                   }));
                 });
             break;
-          case 'download-file':
-            location.href = fileMeta.downloadUrl;
+          case 'rename-file':
+            notifier.confirm(`Bist du sicher, dass du <strong>${fileMeta.name}</strong>${browsePageCfg.typeFront === 'trash' ? ' <em>PERMANENT</em>' : ''} löschen möchtest?`,
+                () => {
+                  notifier.asyncBlock(new Promise((resolve, reject) => {
+                    fetch(fileMeta.href, {
+                      method: 'POST',
+                      headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({action: 'rename', name: 'New-Name'})
+                    })
+                        .then(httpRes => {
+                          if (httpRes.ok) {
+                            reloadFileTable();
+                            return resolve(`<strong>${fileMeta.name}</strong> wurde erfolgreich umbenannt`);
+                          } else {
+                            return reject(`<strong>${fileMeta.name}</strong> konnten nicht umbenannt werden!`);
+                          }
+                        })
+                        .catch(err => {
+                          console.error('Error while renaming file(s):', err);
+
+                          return reject(`Beim Umbenennen ist ein kritischer Fehler aufgetreten: <code>${err.message}</code>`);
+                        });
+                  }));
+                });
+            break;
+          case 'ffmpeg':
+            notifier.asyncBlock(new Promise((resolve, reject) => {
+              fetch(fileMeta.href, {
+                method: 'POST',
+                headers: {
+                  Accept: 'application/json',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({action: 'ffprobe'})
+              })
+                  .then(httpRes => {
+                    if (httpRes.ok) {
+                      httpRes.json()
+                          .then((resBody) => {
+                            prepareModal('ffmpeg', {streams: resBody.streams, fileURI: fileMeta.href});
+
+                            modal.show();
+                            return resolve(`<strong>${fileMeta.name}</strong> wurde analysiert`);
+                          });
+
+                      // reloadFileTable();
+                      // return resolve(`<strong>${fileMeta.name}</strong> wurde erfolgreich umbenannt`);
+                    } else {
+                      return reject(`<strong>${fileMeta.name}</strong> konnte nicht analysiert werden!`);
+                    }
+                  })
+                  .catch(err => {
+                    console.error('Error while renaming file(s):', err);
+
+                    return reject(`Beim Umbenennen ist ein kritischer Fehler aufgetreten: <code>${err.message}</code>`);
+                  });
+            }));
             break;
           default:
             console.error('Unknown context menu action:', action);
@@ -262,8 +514,8 @@ async function onLoadAsync() {
   });
 
   /* misc */
-  mkdirModalElem = document.getElementById('mkdirModal');
-  mkdirModal = new bootstrap.Modal(mkdirModalElem, {
+  modalElem = document.getElementById('modal');
+  modal = new bootstrap.Modal(modalElem, {
     keyboard: true,
     focus: true
   });
@@ -314,9 +566,7 @@ function updateFileDetails(fileMeta, stillValid) {
                           if (body.meta.hasOwnProperty(metaKey)) {
                             const metaValue = body.meta[metaKey];
 
-                            metaHtml += `${metaKey}: ${metaValue.toString()
-                                .replace(/</g, '')
-                                .replace(/>/g, '')}<br>`;
+                            metaHtml += `${sanitizeHtmlTags(metaKey)}: ${sanitizeHtmlTags(metaValue.toString())}<br>`;
                           }
                         }
                       }
@@ -396,7 +646,7 @@ function mkdirDialog(e) {
             console.error('Error while creating a directory:', err);
           })
           .finally(() => {
-            mkdirModal.hide();
+            modal.hide();
             // TODO: disable and un-disable the 'New' button
           });
     } else if (e.target.nodeName === 'INPUT') {
@@ -428,7 +678,7 @@ function mkdirDialog(e) {
         e.target.classList.remove('is-invalid');
       }
 
-      const alertElem = mkdirModalElem.querySelector('div[role="alert"]');
+      const alertElem = modalElem.querySelector('div[role="alert"]');
       if (infoTxt) {
         alertElem.innerText = infoTxt;
         alertElem.classList.remove('d-none');
@@ -440,7 +690,8 @@ function mkdirDialog(e) {
       console.error('Unsupported event target:', e.target);
     }
   } else {
-    mkdirModal.show();
+    prepareModal('mkdir');
+    modal.show();
   }
 }
 
@@ -532,7 +783,9 @@ function onFilesDrop(e) {
             notifier.success(`${body.succeeded} Dateien wurden erfolgreich hochgeladen`);
           }
 
-          reloadFileTable();
+          if (body.succeeded > 0) {
+            reloadFileTable();
+          }
         })
         .catch(err => {
           notifier.alert(`Beim Upload ist ein kritischer Fehler aufgetreten: <code>${err.message}</code>`);
@@ -601,4 +854,14 @@ function isElementVisible(el) {
       el.contains(efp(rect.right, rect.top)) ||
       el.contains(efp(rect.right, rect.bottom)) ||
       el.contains(efp(rect.left, rect.bottom));
+}
+
+/**
+ * @param {string} str
+ */
+function sanitizeHtmlTags(str) {
+  if (typeof str !== 'string') throw new Error(`str is not a string but a '${typeof str}'`);
+
+  return str.replace(/</g, '&gt;')
+      .replace(/>/g, '&lt;');
 }

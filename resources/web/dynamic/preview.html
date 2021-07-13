@@ -9,7 +9,7 @@
 
   <title>Vorschau von %{2- page.file.name -2}</title>
 </head>
-<body class="d-flex h-100 preview-page">
+<body class="d-flex h-100 preview-page" style="flex-wrap: wrap">
 
 %{2_ if (page.raw) { _2}
 <pre><code>%{2- page.raw.replace(/</g, '&lt;').replace(/>/g, '&gt;') -2}</code></pre>
@@ -21,6 +21,8 @@
 <img src="%{2- page.file.downloadPath -2}?preview=1" alt="%{2- page.file.name -2}">
 %{2_ } else if (page.file.mimeType.startsWith('video/')) { _2}
 <video src="%{2- page.file.downloadPath -2}?preview=1" controls></video>
+
+<a href="%{2- page.file.livePath -2}" target="_blank">Request Live Transcode of file</a>
 %{2_ } else if (page.file.mimeType.startsWith('audio/') || page.file.mimeType == 'application/ogg') { _2}
 <audio src="%{2- page.file.downloadPath -2}?preview=1" controls></audio>
 %{2_ } else { _2}

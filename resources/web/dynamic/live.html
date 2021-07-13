@@ -14,15 +14,14 @@
         integrity="sha256-uSj/yBTrKht77G4FPWXNaZozO/CY+Oqd+dKmfKxQ+uI=" crossorigin="anonymous"></script>
 <video id="video" poster="/thumbnail%{2- page.file.browsePath -2}?size=500" controls></video>
 
-<div id="controls">
-
-</div>
+<div id="controls"></div>
 
 <script>
   let hls;
 
   const video = document.getElementById('video');
   const videoSrc = '%{2- page.hls.master -2}';
+  const videoSrcUnauthorized = '%{2- page.hls.masterUnauthorized -2}';
 
   if (Hls.isSupported()) {
     hls = new Hls({
@@ -33,6 +32,8 @@
     hls.loadSource(videoSrc);
     hls.attachMedia(video);
     hls.recoverMediaError();
+
+    document.createElement('google-cast-launcher');
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     video.src = videoSrc;
   }
@@ -40,7 +41,6 @@
   const updateControls = () => {
     const controlsElement = document.getElementById('controls');
     let innerHtml = '';
-
 
     for (let i = 0; i < hls.audioTracks.length; ++i) {
       const audioTrack = hls.audioTracks[i];
@@ -66,33 +66,71 @@
   hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, updateControls);
 </script>
 
-<!--<video id="video" controls></video>-->
+<!--<button id="cast">Cast</button>-->
+
+<!--<script src="https://castjs.io/cast.min.js"></script>-->
+<!--<script>-->
+<!--  // Create new Castjs instance-->
+<!--  const cjs = new Castjs();-->
+
+<!--  cjs.on('event', (e) => {-->
+<!--    console.log('e:', e);-->
+<!--  });  // Catch all events except 'error'-->
+<!--  cjs.on('error', (e) => {-->
+<!--    console.error('e:', e);-->
+<!--  });  // Catch any errors-->
+
+<!--  let cjsUrl = 'https://nas128.sprax2013.de' + videoSrcUnauthorized;-->
+
+<!--  // Wait for user interaction-->
+<!--  document.getElementById('cast')-->
+<!--      .addEventListener('click', () => {-->
+<!--        // Check if casting is available-->
+<!--        if (cjs.available) {-->
+<!--          // Initiate new cast session-->
+<!--          cjs.cast(cjsUrl);-->
+<!--        }-->
+<!--      });-->
+<!--</script>-->
+
+
+<!--<google-cast-launcher></google-cast-launcher>-->
 
 <!--<script>-->
-<!--  var video = document.getElementById('video');-->
-<!--  if (Hls.isSupported()) {-->
-<!--    var hls = new Hls({-->
-<!--      debug: true-->
-<!--    });-->
-<!--    hls.loadSource('%{2- page.hls.master -2}');-->
-<!--    hls.attachMedia(video);-->
-<!--    hls.on(Hls.Events.MEDIA_ATTACHED, () => {-->
-<!--      video.currentTime = 0;-->
-<!--      //   video.muted = true;-->
-<!--      //   video.play();-->
-<!--    });-->
+<!--  window['__onGCastApiAvailable'] = function (isAvailable) {-->
+<!--    console.log('isAvailable:', isAvailable);-->
+
+<!--    if (isAvailable) {-->
+<!--      cast.framework.CastContext.getInstance().setOptions({-->
+<!--        receiverApplicationId: '79168C3D',-->
+<!--        autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED-->
+<!--      });-->
+<!--    }-->
+<!--  };-->
+<!--</script>-->
+<!--<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>-->
+<!--<script>-->
+<!--  let castSession;-->
+<!--  let mediaInfo;-->
+<!--  let request;-->
+<!--  let player;-->
+<!--  let playerController;-->
+
+<!--  function loadMedia(src) {-->
+<!--    castSession = cast.framework.CastContext.getInstance().getCurrentSession();-->
+
+<!--    player = new cast.framework.RemotePlayer();-->
+<!--    playerController = new cast.framework.RemotePlayerController(player);-->
+
+<!--    mediaInfo = new chrome.cast.media.MediaInfo(src || 'https://nas128.sprax2013.de' + videoSrcUnauthorized, 'application/x-mpegURL');-->
+<!--    request = new chrome.cast.media.LoadRequest(mediaInfo);-->
+<!--    castSession.loadMedia(request)-->
+<!--        .then(-->
+<!--            () => console.log('Load succeed'),-->
+<!--            (errCode) => console.log('Error code: ' + errCode)-->
+<!--        );-->
 <!--  }-->
-<!--      // hls.js is not supported on platforms that do not have Media Source Extensions (MSE) enabled.-->
-<!--      // When the browser has built-in HLS support (check using `canPlayType`), we can provide an HLS manifest (i.e. .m3u8 URL) directly to the video element throught the `src` property.-->
-<!--  // This is using the built-in support of the plain video element, without using hls.js.-->
-<!--  else if (video.canPlayType('application/vnd.apple.mpegurl')) {-->
-<!--    video.src = '%{2- page.hls.master -2}';-->
-<!--    // video.addEventListener('canplay', () => {-->
-<!--    //   video.play();-->
-<!--    // });-->
-<!--  }-->
-<!--</script>
--->
+<!--</script>-->
 %{2_ } else if (false /* page.file.mimeType.startsWith('audio/') || page.file.mimeType == 'application/ogg' */) { _2}
 <audio src="%{2- page.file.downloadPath -2}?preview=1" controls></audio>
 %{2_ } else { _2}
