@@ -7,11 +7,15 @@ import { config, runningInProduction } from './index';
 export enum PageType {
   BROWSE,
   PREVIEW,
-  LIVE
+  LIVE,
+
+  ADMIN
 }
 
 export class PageGenerator {
   private static readonly HTML_PATH = path.resolve(joinPath(__dirname, '..', 'resources', 'web', 'dynamic'));
+
+  readonly globals: { url: { base: string, static: string } };
 
   readonly cachedPages: { [key in PageType]: string | (() => string) };
 
@@ -19,10 +23,12 @@ export class PageGenerator {
     const FILE_PATHS: { [key in PageType]: string } = {
       [PageType.BROWSE]: joinPath(PageGenerator.HTML_PATH, 'browse.html'),
       [PageType.PREVIEW]: joinPath(PageGenerator.HTML_PATH, 'preview.html'),
-      [PageType.LIVE]: joinPath(PageGenerator.HTML_PATH, 'live.html')
+      [PageType.LIVE]: joinPath(PageGenerator.HTML_PATH, 'live.html'),
+
+      [PageType.ADMIN]: joinPath(PageGenerator.HTML_PATH, 'admin.html')
     };
 
-    const globals = {
+    this.globals = {
       url: {
         base: PageGenerator.generateUrlPrefix(config.data.web, config.data.web.urlPrefix.dynamicContentHost),
         static: PageGenerator.generateUrlPrefix(config.data.web, config.data.web.urlPrefix.staticContentHost)
@@ -34,7 +40,7 @@ export class PageGenerator {
     for (const filesKey in FILE_PATHS) {
       const getHtml = () => this.renderEjs(
           readFileSync((FILE_PATHS as { [key: string]: string })[filesKey], 'utf-8'),
-          0, {globals}
+          0, {globals: this.globals}
       );
 
       tmpCache[filesKey] = runningInProduction ? getHtml() : getHtml;

@@ -1,6 +1,10 @@
+import { OAuthProviderEnum } from './utils/Database';
+
 declare module 'express-session' {
   // noinspection JSUnusedGlobalSymbols
   interface SessionData {
+    suggestOAuthSetup: boolean;
+
     user: NasUser;
   }
 }
@@ -12,14 +16,13 @@ declare module 'ejs' {
   }
 }
 
+export interface IConfigOAuthProvider {
+  readonly client_id: string;
+  readonly client_secret: string;
+}
+
 export interface IConfig {
-  readonly oauth: {
-    readonly github: {
-      readonly client_id: string;
-      readonly client_secret: string;
-      readonly redirectUri: string;
-    }
-  };
+  readonly oauth: { [key in OAuthProviderEnum]: IConfigOAuthProvider };
 
   readonly web: {
     readonly listen: {
@@ -27,7 +30,7 @@ export interface IConfig {
       readonly path: string;
       readonly host: string;
       readonly port: number;
-    }
+    };
 
     readonly serveStatic: boolean;
     readonly trustProxy: boolean;
@@ -36,7 +39,7 @@ export interface IConfig {
       readonly https: boolean;
       readonly dynamicContentHost: string;
       readonly staticContentHost: string;
-    }
+    };
   };
 
   readonly postgreSQL: {
@@ -71,25 +74,14 @@ export interface IConfig {
 
 export interface NasUser {
   readonly id: number;
-  readonly githubId: number | null;
 
   readonly name: string;
-}
 
-export interface NasUserDb extends NasUser {
-  readonly githubData?: {
-    readonly id: number;
+  readonly isAdmin: boolean;
 
-    readonly login: string;
-    readonly name: string;
-    readonly email: string;
+  readonly tokenId: string;
 
-    readonly avatar_url: string;
-    readonly html_url: string;
-
-    readonly created_at: string;
-    readonly updated_at: string;
-  };
+  readonly storageQuota: number | null;
 }
 
 export interface BrowsePageData extends IPageData {
@@ -114,6 +106,7 @@ export interface PreviewPageData extends IPageData {
 
       readonly downloadPath: string;
       readonly livePath: string;
+      readonly downloadPathNoAuth: string;
 
       readonly alternatives: Array<{
         readonly mimeType: string;
@@ -135,6 +128,12 @@ export interface LivePageData extends IPageData {
       readonly master: string;
       readonly masterUnauthorized: string;
     }
+  };
+}
+
+export interface AdminPageData extends IPageData {
+  readonly page: {
+    readonly accounts: Array<NasUser & { oauthCount: number }>;
   };
 }
 

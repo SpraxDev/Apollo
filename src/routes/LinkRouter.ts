@@ -76,8 +76,8 @@ export class LinkRouter {
     const linkData = this.links[id];
 
     if (linkData) {
-      if (linkData.ttl) {
-        if (linkData.created + linkData.ttl <= Date.now()) {
+      if (typeof linkData.ttl == 'number') {
+        if (linkData.created + linkData.ttl > Date.now()) {
           return true;
         }
 
@@ -99,57 +99,55 @@ export class LinkRouter {
 
       const user = req.session?.user;
 
-      try {
-        const linkId = req.path.substring(1, req.path.indexOf('/', 1));
+      const pathSecondSlashIndex = req.path.indexOf('/', 1);
+      const linkId = req.path.substring(1, pathSecondSlashIndex == -1 ? undefined : pathSecondSlashIndex);
 
-        const linkData = this.getLink(linkId);
+      const linkData = this.getLink(linkId);
 
-        if (linkData) {
-          if (linkData.anyoneCanAccess || linkData.user == user?.id) {
-            const absPath = path.normalize(path.join(linkData.absPath, req.path.substring(req.path.indexOf(linkId) + linkId.length)));
-            const isDirectory = NasUtils.isDirectory(absPath);
+      if (linkData) {
+        if (linkData.anyoneCanAccess || linkData.user == user?.id) {
+          const absPath = path.normalize(path.join(linkData.absPath, req.path.substring(req.path.indexOf(linkId) + linkId.length)));
+          const isDirectory = NasUtils.isDirectory(absPath);
 
-            if (isDirectory == null) {
-              res.status(404)
-                  .send('Could not find the file');
-            } else if (isDirectory) {
-              res.status(403)
-                  .send('Not allowed to generate a file index for the given directory');
-            } else {
-              NasUtils.fetchFile(absPath)
-                  .then((file) => {
-                    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept-Encoding, Range, Accept');
-                    res.header('Access-Control-Allow-Origin', req.header('Origin') || '*');
-                    if (req.header('Origin')) {
-                      res.header('Vary', 'Origin');
-                    }
-
-                    if (path.basename(absPath).endsWith('.m3u8')) {
-                      file.mime = 'application/x-mpegURL';
-                    }
-
-                    res
-                        .type(file.mime || 'application/octet-stream')
-                        .sendFile(absPath, (err) => {
-                          if (err && err.message != 'Request aborted' && err.message != 'write EPIPE') next(err);
-                        });
-                  })
-                  .catch(next);
-            }
-          } else if (!linkData.anyoneCanAccess) {
-            return next(isUserExpectedToBeAuthenticated ? new Error('User is not authenticated') : undefined);
+          if (isDirectory == null) {
+            res.status(404)
+                .send('Could not find the file');
+          } else if (isDirectory) {
+            res.status(403)
+                .send('Not allowed to generate a file index for the given directory');
           } else {
-            return next(isUserExpectedToBeAuthenticated ? new Error('User does not have access to this link') : undefined);
+            NasUtils.fetchFile(absPath)
+                .then((file) => {
+                  // FIXME: Wurde mal für Chromecast hinzugefügt. Noch immer gebraucht?
+                  // res.header('Access-Control-Allow-Headers', 'Content-Type, Accept-Encoding, Range, Accept');
+                  // res.header('Access-Control-Allow-Origin', req.header('Origin') || '*');
+                  // if (req.header('Origin')) {
+                  //   res.header('Vary', 'Origin');
+                  // }
+                  //
+                  // if (path.basename(absPath).endsWith('.m3u8')) {
+                  //   file.mime = 'application/x-mpegURL';
+                  // }
+
+                  res
+                      .type(file.mime || 'application/octet-stream')
+                      .sendFile(absPath, (err) => {
+                        if (err && err.message != 'Request aborted' && err.message != 'write EPIPE') next(err);
+                      });
+                })
+                .catch(next);
           }
+        } else if (!linkData.anyoneCanAccess) {
+          return next(isUserExpectedToBeAuthenticated ? new Error('User is not authenticated') : undefined);
         } else {
-          if (isUserExpectedToBeAuthenticated) {
-            return next();
-          } else {
-            res.sendStatus(404);
-          }
+          return next(isUserExpectedToBeAuthenticated ? new Error('User does not have access to this link') : undefined);
         }
-      } catch (err) {
-        next(err);
+      } else {
+        if (isUserExpectedToBeAuthenticated) {
+          return next();
+        } else {
+          res.sendStatus(404);
+        }
       }
     };
   }

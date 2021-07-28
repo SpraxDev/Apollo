@@ -21,10 +21,17 @@ export class Config extends File {
   protected getDefaults(): IConfig {
     return {
       oauth: {
-        github: {
+        GitHub: {
           client_id: '',
-          client_secret: '',
-          redirectUri: 'http://localhost:8092/login/github'
+          client_secret: ''
+        },
+        Microsoft: {
+          client_id: '',
+          client_secret: ''
+        },
+        Google: {
+          client_id: '',
+          client_secret: ''
         }
       },
 

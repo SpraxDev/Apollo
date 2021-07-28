@@ -22,7 +22,7 @@ export class DownloadRouter {
 
       const forceDownload = req.query.force && req.query.force == '1';
 
-      Utils.restful(req, res, {
+      Utils.restful(req, res, next, {
         'get': () => {
           const absPath = NasUtils.getRequestedPath(user, 'data', decodeURI(req.path));
           const isDirectory = NasUtils.isDirectory(absPath);

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de" class="h-100">
+<head>
+  %{0- include('/_head.html') -0}
+
+  <title>Admin | NASWeb</title>
+</head>
+
+<body class="d-flex flex-column h-100">
+<header>
+  <nav class="navbar navbar-light bg-light" aria-label="Header mit Informationen">
+    <div class="container-fluid">
+      <div class="me-auto">
+        <span class="navbar-brand">NAS<sub>Web</sub></span>
+      </div>
+
+      <div>
+        Eingeloggt als %{2- user.name 2}
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <!-- Modal -->
+  <div class="modal fade" id="modal" tabindex="-1" aria-labelledby="ModalTitle" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="ModalTitle"><!-- Title --></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body"><!-- Body --></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row w-100">
+    <!-- Left sidebar -->
+    <div class="col-auto mt-5">
+      <div class="container-fluid small">
+        <nav class="nav flex-column" aria-label="Sidebar mit Navigationselementen">
+          <a class="nav-link active" href="%{0- globals.url.base 0}/browse/"><img
+              src="%{0- globals.url.static 0}/img/feathericons/cloud.svg"
+              width="24" height="24" alt="" aria-hidden="true">&nbsp;Meine Dateien</a>
+
+          <a class="nav-link" href="#"><img src="%{0- globals.url.static 0}/img/feathericons/users.svg"
+                                            width="24" height="24" alt="" aria-hidden="true">&nbsp;Für mich freigegeben</a>
+
+          <a class="nav-link" href="#"><img src="%{0- globals.url.static 0}/img/feathericons/clock.svg" width="24"
+                                            height="24" alt="" aria-hidden="true">&nbsp;Neuste</a>
+
+          <a class="nav-link" href="%{0- globals.url.base 0}/trash/"><img
+              src="%{0- globals.url.static 0}/img/feathericons/trash-2.svg"
+              width="24" height="24" alt="" aria-hidden="true">&nbsp;Papierkorb</a>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Center -->
+    <div class="col">
+      <h1>
+        List of all accounts
+
+        <button class="btn btn-sm btn-outline-dark rounded-pill"><!--
+             --><img src="%{0- globals.url.static 0}/img/feathericons/plus.svg" width="24" height="24" alt=""
+                     aria-hidden="true"><!--
+             -->&nbsp;Neu<!--
+           --></button>
+      </h1>
+
+      <ul>
+        %{2_ for (const nasUser of page.accounts) { _2}
+        <li><b>#%{2- nasUser.id 2}</b> - <i>%{2- nasUser.name 2}</i> (%{2- nasUser.oauthCount 2} OAuth connections)</li>
+        %{2_ } _2}
+      </ul>
+    </div>
+  </div>
+</main>
+
+%{0- include('/_footer.html') -0}
+</body>
+</html>

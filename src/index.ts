@@ -8,7 +8,7 @@ import { ProcessManager } from './utils/ProcessManager';
 import { WebServer } from './WebServer';
 
 let server: WebServer | null = null;
-let database: Database | null = null;
+let database: Database;
 let cacheUtils: CacheUtils;
 export const processManager: ProcessManager = new ProcessManager();
 
@@ -74,7 +74,7 @@ export const appVersion: string = JSON.parse(readFileSync(joinPath(__dirname, '.
 
 export const WORKING_DIR = resolvePath('/app/WORKING_DIR' /* TODO: REMOVE DEBUG */);
 export const config = new Config();
-database = config.data.postgreSQL.enabled ? new Database(config.data.postgreSQL) : null;
+database = new Database(config.data.postgreSQL);
 cacheUtils = new CacheUtils(config.data.redis);
 export const adminPassword = database ? null : randomBytes(16).toString('hex');
 
@@ -82,7 +82,8 @@ export function getCacheUtils(): CacheUtils {
   return cacheUtils;
 }
 
-export function getDatabase(): Database | null {
+// Never return null and throw error on queries instead if not enabled/connected
+export function getDatabase() {
   return database;
 }
 

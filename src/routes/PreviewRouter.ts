@@ -5,6 +5,7 @@ import { PreviewPageData } from '../global';
 import { PageGenerator, PageType } from '../PageGenerator';
 import { NasUtils } from '../utils/NasUtils';
 import { WebServer } from '../WebServer';
+import { LinkRouter } from './LinkRouter';
 
 const additionalSupportedTypes = ['application/pdf', 'application/ogg'];
 
@@ -31,74 +32,73 @@ export class PreviewRouter {
 
       const user = req.session.user;
 
-      try {
-        const absPath = NasUtils.getRequestedPath(user, 'data', decodeURI(req.path.substring(req.path.indexOf('/', 1))));
-        const isDirectory = NasUtils.isDirectory(absPath);
+      const absPath = NasUtils.getRequestedPath(user, 'data', decodeURI(req.path.substring(req.path.indexOf('/', 1))));
+      const isDirectory = NasUtils.isDirectory(absPath);
 
-        if (isDirectory == null) {
-          res.status(404)
-              .send('Could not find the file');
-        } else if (isDirectory) {
-          res.status(404)
-              .send('Cannot generate a thumbnail for a directory');
-        } else {
-          // const originalFile = req.query.original && req.query.original == '1';
+      if (isDirectory == null) {
+        res.status(404)
+            .send('Could not find the file');
+      } else if (isDirectory) {
+        res.status(404)
+            .send('Cannot generate a thumbnail for a directory');
+      } else {
+        // const originalFile = req.query.original && req.query.original == '1';
 
-          NasUtils.fetchFile(absPath)
-              .then((file) => {
-                if (file.mime) {
-                  const downloadPath = `/download${req.path.substring(req.path.indexOf('/', 1))}`;
-                  const livePath = `/live/browse${req.path.substring(req.path.indexOf('/', 1))}`;
+        NasUtils.fetchFile(absPath)
+            .then((file) => {
+              if (file.mime) {
+                const downloadPath = `/download${req.path.substring(req.path.indexOf('/', 1))}`;
+                const downloadPathNoAuth = `/link/${LinkRouter.getOrCreateLink(user, absPath, true, 60 * 60 * 6 /* 6h */)}`;
+                const livePath = `/live/browse${req.path.substring(req.path.indexOf('/', 1))}`;
 
-                  if (file.mime.startsWith('text/')) {
-                    const pageData: PreviewPageData = {
-                      user,
-                      page: {
-                        raw: fs.readFileSync(absPath, 'utf-8'),
-                        file: {
-                          name: path.basename(absPath),
-                          mimeType: file.mime,
-                          downloadPath,
-                          livePath,
-                          alternatives: []
-                        }
+                if (file.mime.startsWith('text/')) {
+                  const pageData: PreviewPageData = {
+                    user,
+                    page: {
+                      raw: fs.readFileSync(absPath, 'utf-8'),
+                      file: {
+                        name: path.basename(absPath),
+                        mimeType: file.mime,
+                        downloadPath,
+                        livePath,
+                        downloadPathNoAuth,
+                        alternatives: []
                       }
-                    };
+                    }
+                  };
 
-                    res.type('html')
-                        .send(pageGenerator.getPage(PageType.PREVIEW, pageData));
-                  } else if (file.mime.startsWith('image/') ||
-                      file.mime.startsWith('audio/') ||
-                      file.mime.startsWith('video/') ||
-                      additionalSupportedTypes.includes(file.mime)) {
-                    const pageData: PreviewPageData = {
-                      user,
-                      page: {
-                        file: {
-                          name: path.basename(absPath),
-                          mimeType: file.mime,
-                          downloadPath,
-                          livePath,
-                          alternatives: []
-                        }
+                  res.type('html')
+                      .send(pageGenerator.getPage(PageType.PREVIEW, pageData));
+                } else if (file.mime.startsWith('image/') ||
+                    file.mime.startsWith('audio/') ||
+                    file.mime.startsWith('video/') ||
+                    additionalSupportedTypes.includes(file.mime)) {
+                  const pageData: PreviewPageData = {
+                    user,
+                    page: {
+                      file: {
+                        name: path.basename(absPath),
+                        mimeType: file.mime,
+                        downloadPath,
+                        downloadPathNoAuth,
+                        livePath,
+                        alternatives: []
                       }
-                    };
+                    }
+                  };
 
-                    res.type('html')
-                        .send(pageGenerator.getPage(PageType.PREVIEW, pageData));
-                  } else {
-                    res.status(415)
-                        .send(`Cannot generate a preview for file type '${file.mime}'`);
-                  }
+                  res.type('html')
+                      .send(pageGenerator.getPage(PageType.PREVIEW, pageData));
                 } else {
                   res.status(415)
                       .send(`Cannot generate a preview for file type '${file.mime}'`);
                 }
-              })
-              .catch(next);
-        }
-      } catch (err) {
-        next(err);
+              } else {
+                res.status(415)
+                    .send(`Cannot generate a preview for file type '${file.mime}'`);
+              }
+            })
+            .catch(next);
       }
     };
   }

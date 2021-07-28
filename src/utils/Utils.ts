@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import * as fs from 'fs';
 
 export class Utils {
@@ -77,20 +77,39 @@ export class Utils {
    *
    * Original author: https://stackoverflow.com/a/15754373/9346616
    */
-  static restful(req: Request, res: Response, handlers: { [key: string]: () => void }): void {
+  static restful(req: Request, res: Response, next: NextFunction, handlers: { [key: string]: () => void | Promise<void> }): void {
     const method = (req.method || '').toLowerCase();
 
-    if (method in handlers) return handlers[method]();
-    if (method == 'head' && 'get' in handlers) return handlers['get']();
+    if (method in handlers) {
+      try {
+        const handlerResult = handlers[method]();
 
-    const allowedMethods: string[] = Object.keys(handlers);
-    if (!allowedMethods.includes('head')) {
-      allowedMethods.push('head');
+        if (handlerResult instanceof Promise) {
+          handlerResult.catch(next);
+        }
+      } catch (err) {
+        next(err);
+      }
+    } else if (method == 'head' && 'get' in handlers) {
+      try {
+        const handlerResult = handlers['get']();
+
+        if (handlerResult instanceof Promise) {
+          handlerResult.catch(next);
+        }
+      } catch (err) {
+        next(err);
+      }
+    } else {
+      const allowedMethods: string[] = Object.keys(handlers);
+      if (!allowedMethods.includes('head')) {
+        allowedMethods.push('head');
+      }
+
+      res.set('Allow', allowedMethods.join(', ').toUpperCase());
+      res.sendStatus(405);
+      // return next(ApiError.create(ApiErrs.METHOD_NOT_ALLOWED, { allowedMethods }));   // TODO: send error-custom body
     }
-
-    res.set('Allow', allowedMethods.join(', ').toUpperCase());
-    res.sendStatus(405);
-    // return next(ApiError.create(ApiErrs.METHOD_NOT_ALLOWED, { allowedMethods }));   // TODO: send error-custom body
   }
 
   static compareStrings(a: string, b: string): -1 | 0 | 1 {

@@ -413,7 +413,7 @@ async function onLoadAsync() {
                 });
             break;
           case 'rename-file':
-            notifier.confirm(`Bist du sicher, dass du <strong>${fileMeta.name}</strong>${browsePageCfg.typeFront === 'trash' ? ' <em>PERMANENT</em>' : ''} löschen möchtest?`,
+            notifier.confirm(`Bist du sicher, dass du <strong>${fileMeta.name}</strong> umbenennen möchtest?`,
                 () => {
                   notifier.asyncBlock(new Promise((resolve, reject) => {
                     fetch(fileMeta.href, {

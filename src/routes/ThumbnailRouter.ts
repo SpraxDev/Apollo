@@ -27,69 +27,65 @@ export class ThumbnailRouter {
 
       const user = req.session.user;
 
-      try {
-        const absPath = NasUtils.getRequestedPath(user, type, decodeURI(req.path));
-        const isDirectory = NasUtils.isDirectory(absPath);
+      const absPath = NasUtils.getRequestedPath(user, type, decodeURI(req.path));
+      const isDirectory = NasUtils.isDirectory(absPath);
 
-        if (isDirectory == null) {
-          res.status(404)
-              .send('Could not find the file');
-        } else if (isDirectory) {
-          res.status(404)
-              .send('Cannot generate a thumbnail for a directory');
-        } else {
-          const sizeStr = req.query.size;
-          let size = 500;
+      if (isDirectory == null) {
+        res.status(404)
+            .send('Could not find the file');
+      } else if (isDirectory) {
+        res.status(404)
+            .send('Cannot generate a thumbnail for a directory');
+      } else {
+        const sizeStr = req.query.size;
+        let size = 500;
 
-          if (sizeStr) {
-            if (typeof sizeStr != 'string' || !Utils.isNumeric(sizeStr)) {
-              res.status(400)
-                  .send(`Only numeric values are allowed for the query-param 'size'`);
-              return;
-            }
-
-            size = parseInt(sizeStr);
-
-            if (size > 2000) {
-              res.status(400)
-                  .send(`Thumbnails can currently not exceed a size of 2000px`);
-              return;
-            }
+        if (sizeStr) {
+          if (typeof sizeStr != 'string' || !Utils.isNumeric(sizeStr)) {
+            res.status(400)
+                .send(`Only numeric values are allowed for the query-param 'size'`);
+            return;
           }
 
-          getCacheUtils()
-              .getThumbnail(user, absPath, size)
-              .then(thumbnail => {
-                if (thumbnail) {
-                  res.status(200)
-                      .type(thumbnail.mime)
-                      .send(thumbnail.data);
-                } else {
-                  res.status(404)
-                      .type('txt')
-                      .send('Could not generate a thumbnail for the given file (does it exist?)');
-                }
-              })
-              .catch((err) => {
-                if (err instanceof HttpError) {
-                  res.status(err.httpCode);
+          size = parseInt(sizeStr);
 
-                  if (err.httpCode == 415) {
-                    res.type('png')
-                        .sendFile(this.FALLBACK_IMG_PATH, (err) => {
-                          if (err && err.message != 'Request aborted' && err.message != 'write EPIPE') next(err);
-                        });
-                  } else {
-                    res.type('txt')
-                        .send(err.message);
-                  }
-                } else {
-                  next(err);
-                }
-              });
+          if (size > 2000) {
+            res.status(400)
+                .send(`Thumbnails can currently not exceed a size of 2000px`);
+            return;
+          }
         }
-      } catch (err) {
-        next(err);
+
+        getCacheUtils()
+            .getThumbnail(user, absPath, size)
+            .then(thumbnail => {
+              if (thumbnail) {
+                res.status(200)
+                    .type(thumbnail.mime)
+                    .send(thumbnail.data);
+              } else {
+                res.status(404)
+                    .type('txt')
+                    .send('Could not generate a thumbnail for the given file (does it exist?)');
+              }
+            })
+            .catch((err) => {
+              if (err instanceof HttpError) {
+                res.status(err.httpCode);
+
+                if (err.httpCode == 415) {
+                  res.type('png')
+                      .sendFile(this.FALLBACK_IMG_PATH, (err) => {
+                        if (err && err.message != 'Request aborted' && err.message != 'write EPIPE') next(err);
+                      });
+                } else {
+                  res.type('txt')
+                      .send(err.message);
+                }
+              } else {
+                next(err);
+              }
+            });
       }
     };
   }

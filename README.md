@@ -29,3 +29,8 @@
 * User and Permission based
     * Ordner und Dateien, auf die man Zugriff bekommen hat, findet man in einem extra Menü-Punkt
         * Es ist möglich eine Verlinkung auf diese in die eigenen Ordner zu laden
+* Virtuelle FIleSystems mounten können (WebDAV, SSH, GDrive, ...)
+* OAuth
+  * Atlassian
+  * GitLab
+  * Discord

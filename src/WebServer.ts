@@ -1,6 +1,7 @@
 import expressSessionPG from 'connect-pg-simple';
 import express from 'express';
 import expressSession from 'express-session';
+import * as fs from 'fs';
 import {
   chmodSync,
   existsSync as fileExistsSync,
@@ -11,20 +12,26 @@ import {
 } from 'fs';
 import { createServer, Server } from 'http';
 import morgan from 'morgan';
+import * as path from 'path';
 import { join as joinPath } from 'path';
 import * as rfs from 'rotating-file-stream';
+import { promisify } from 'util';
 import { config, getDatabase, runningInProduction } from './index';
 import { PageGenerator } from './PageGenerator';
+import { AdminRouter } from './routes/AdminRouter';
 import { BrowseRouter } from './routes/BrowseRouter';
 import { DownloadRouter } from './routes/DownloadRouter';
 import { LinkRouter } from './routes/LinkRouter';
 import { LiveRouter } from './routes/LiveRouter';
 import { LoginRouter } from './routes/LoginRouter';
+import { LogoutRouter } from './routes/LogoutRouter';
 import { PreviewRouter } from './routes/PreviewRouter';
 import { ThumbnailRouter } from './routes/ThumbnailRouter';
 import { NasUtils } from './utils/NasUtils';
 import { ServerTiming } from './utils/ServerTiming';
 import { Utils } from './utils/Utils';
+
+const fsExists = promisify(fs.exists);
 
 export class WebServer {
   readonly pageGenerator;
@@ -61,11 +68,11 @@ export class WebServer {
     // Setup session handler
     this.expressApp.use(expressSession({
       name: 'sessID',
-      store: getDatabase()?.isAvailable() ?
+      store: getDatabase().isAvailable() ?
           new (expressSessionPG(expressSession))({
             tableName: 'sessions',
-            pruneSessionInterval: 24 * 60 * 60, /* 24h */
-            pool: getDatabase()?.getPool() ?? undefined
+            pruneSessionInterval: 48 * 60 * 60, /* 48h */
+            pool: getDatabase().getPool()
           })
           : undefined,
       secret: config.data.secret,
@@ -77,7 +84,7 @@ export class WebServer {
         secure: config.data.cookies.secure,
         httpOnly: true,
         sameSite: 'lax',
-        maxAge: getDatabase()?.isAvailable() ? 30 * 24 * 60 * 60 * 1000 /* 30d */ : 30 * 60 * 1000 /* 30min */
+        maxAge: getDatabase().isAvailable() ? 30 * 24 * 60 * 60 * 1000 /* 30d */ : 30 * 60 * 1000 /* 30min */
       }
     }));
 
@@ -198,14 +205,46 @@ export class WebServer {
   private setupNonSessionRoutes() {
     // Serving static files too
     if (config.data.web.serveStatic) {
-      this.expressApp.use(express.static(joinPath(__dirname, '..', 'resources', 'web', 'static')));
+      const staticPath = joinPath(__dirname, '..', 'resources', 'web', 'static');
+
+      // TODO: Extract parts of it into own sendFile method to use
+      this.expressApp.use((req, res, next) => {
+        const reqFilePath = path.normalize(path.join(staticPath, req.originalUrl));
+
+        // Outside of static dir?
+        if (!reqFilePath.startsWith(staticPath)) return next();
+
+        // Does file exist?
+        if (fs.existsSync(reqFilePath)) {
+          const stat = fs.statSync(reqFilePath);
+
+          if (stat.isFile()) {
+            if (stat.size == Number.MAX_SAFE_INTEGER ||
+                stat.size == Number.MIN_SAFE_INTEGER ||
+                !Number.isFinite(stat.size) ||
+                Number.isNaN(stat.size)) {
+              next(new Error(`Whoa! The file you are trying to download has a size of '${stat.size}' which is not possible (too large? broken file system?)`));
+            }
+
+            res
+                .sendFile(reqFilePath, (err) => {
+                  if (err && err.message != 'Request aborted' && err.message != 'write EPIPE') next(err);
+                });
+
+            return;
+          }
+        }
+
+        next();
+      });
     }
 
     this.expressApp.use('/link', LinkRouter.getRouter(false));
   }
 
   private setupNormalRoutes() {
-    this.expressApp.use('/login', LoginRouter.getRouter());
+    this.expressApp.use('/login', LoginRouter.getRouter(this.pageGenerator));
+    this.expressApp.use('/logout', LogoutRouter.getRouter());
 
     this.expressApp.use((req, res, next) => {
       if (!WebServer.isLoggedIn(req)) {
@@ -226,6 +265,8 @@ export class WebServer {
     this.expressApp.use('/preview', PreviewRouter.getRouter(this.pageGenerator));
     this.expressApp.use('/live', LiveRouter.getRouter(this.pageGenerator));
     this.expressApp.use('/link', LinkRouter.getRouter(true));
+
+    this.expressApp.use('/admin', AdminRouter.getRouter(this.pageGenerator));
   }
 
   private setupErrorHandling() {
@@ -272,7 +313,7 @@ export class WebServer {
   }
 
   public static isLoggedIn(req: express.Request): boolean {
-    if (getDatabase()?.isAvailable()) {
+    if (getDatabase().isAvailable()) {
       return !!req.session?.user;
     }
 
